@@ -4,6 +4,12 @@
 This concept of a container has been revolutionary for both software and hardware because developers can now ensure a consistent software driven deployment process to production servers as well as reducing the need for headcount specifically dedicated to server deployment and maintanence. For those of you working with hardware, Raspberry Pis also now support Docker:
 [https://www.raspberrypi.org/blog/docker-comes-to-raspberry-pi/](https://www.raspberrypi.org/blog/docker-comes-to-raspberry-pi/)
 
+"Docker is an application delivery technology, not a virtualization technology..." This was the key statement in the [Docker blog](https://blog.docker.com/2016/03/containers-are-not-vms/) that helped me understand what Docker is, how it is different from virtual machines and why Docker is important. 
+
+Here are some additional links that can help you understand the benefits of Docker beyond simply being a requirement for the MobiledgeX platform:
+* https://www.capside.com/labs/using-docker-for-development/ 
+* https://codeburst.io/the-advantages-of-using-docker-for-web-development-23096c457fad
+
 ## Benefits of Docker During Development
 Some of the benefits of using Docker in development include:
 
@@ -18,10 +24,10 @@ To go from code to Github to live server deployment can be accomplished with a s
 
 ## Next Steps with Docker
 Now that we have covered the benefits of Docker, let's move onto code examples
-[Docker NodeJS Hello World](https://github.com/skydvr01/MobiledgeX_Docker_NodeJS_Hello_World)
-[Docker GoLang Hello World](https://github.com/skydvr01/MobiledgeX_Docker_GoLang_Hello_World)
+- [Docker NodeJS Hello World](https://github.com/skydvr01/MobiledgeX_Docker_NodeJS_Hello_World)
+- [Docker GoLang Hello World](https://github.com/skydvr01/MobiledgeX_Docker_GoLang_Hello_World)
 
-Continuous Integration and Delivery with Docker. Continuous delivery is all about reducing risk and delivering value faster by producing reliable software in short iterations.
+
 
 ## Reference Blogs and Youtube Videos
 - [https://www.youtube.com/watch?v=SC7lLm6QAb8](https://www.youtube.com/watch?v=SC7lLm6QAb8)
