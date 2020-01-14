@@ -1,0 +1,629 @@
+This tutorial demonstrates the potential for low latency benefits in a real-time application on an edge cloudlet server. The Ping Pong application demonstration and server show that the total time of interaction on a fast-paced game may be far below the network latency time to the server. 
+
+## Workshop Goal
+
+ 1. Add edge support to the mobile ping pong app. This task is located in the MobiledgeXIntegration.cs file. 
+ 2. Sync and interpolate the ball and paddles to have it act natural.    
+ 3. Compare with edge (TDG and TMPL), with no interpolation or hacks.
+
+## Requirements & Prerequisites
+**Note:** This document provides instruction for users of a MacOS host development platform. However, the steps described do apply to other development platforms as well.
+
+**Note:** For hackathon participants, please see the event organizer for your specific user name and password.Basic development experience with Unity and C#.
+
+ - Basic development experience with Unity and C#. 
+ - Xcode for iOS. 
+ - Unity installation, with Desktop. Including Android and iOS build targets.
+ - Obtain an Apple Developer ID for code signing here. Select the Enroll button.
+ - Install Unity Hub here. (version: 2019.2.4f1 or the latest version available)
+	 - A personal license is provided when the user meets specific conditions. If conditions are not met, a license from Unity will be required. 
+	 - Access the MobiledgeX Nuget private repository. Although Unity has an Asset Store, the MobiledgeX MatchingEngine SDK is not yet available. 
+	 - Access the empty version of the networked Ping Pong Game here. Access to the completed MobiledgeX enabled Ping Pong Game here. 
+	 - Use Git version control management on the command line. 
+	 - Node.js experience is required if you're working on the WebSocket server code. 
+		 - SSH access to a VM: ubuntu@vmhackathonteam-N 
+		 - Docker experience is required when working on the server code. Your team has to deploy locally on your machine or upload a new version to your hackathon edge server.
+
+## About the Ping Pong Application
+The Ping Pong Application is built on Unity, and explained in the tutorial found here. It is recommended to review the tutorial if the original code is desired, or if the user is inexperienced with Unity.
+
+**Note:** The Ping Pong Application does not offer network multiplayer capabilities. Nonetheless, the Ping Pong Application does permit two players to play, where state synchronization operates through a WebSocket server that maintains a minimal game lobby. The Web Socket server supports the timing of the opposing player's ball, and paddles within the rounds played.
+
+The Ping Pong Application WebSocket edge cloudlet server is provided and maintained within a Docker Container. The WebSocket Edge cloudlet server resides with the MatchingEngine SDK, where the WebSocket cloud server locates the nearest cloudlet with FindCloudlet(). With the nearest cloudlet determined, the WebSocket cloud server returns the information to the application for synchronization of play. The Ping Pong Application uses this cloudlet URI to connect to the server.
+
+**Note:** At this time, GPS location is unavailable within the workshop. Therefore, the WebSocket cloud server is unable to track a specific location to determine if a new, closer, edge cloudlet is required. The usage depends on the actual application.
+
+**Tip:** The Ping Pong Application possesses an uncomplicated game mechanic, which gives the user the option to play using the original code and also return to the aforementioned multiplayer version.
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-24 at 12.03.02 PM.png
+
+In the workshop demonstration application, the green paddles and ball represent the server and player lag that exist within the multiplayer environment operating on an edge server or public cloud.
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-24 at 4.10.40 PM.png
+
+## Step 1: Get the Workshop code
+The MobiledgeX edge-cloud-sampleapps repo can be found here.
+
+To retrieve the workshop code:
+
+ 1. git clone https://github.com/mobiledgex/edge-cloud-sampleapps.git
+ 2. cd edge-cloud-sampleapps/unity/PingPongGameExample/PingPongGameSkeleton
+
+Here is the basic code structure:
+
+PingPongApplicationExample
+
+\__PingPongGameSkeleton - Pong game, without MobiledgeX SDK integration. Open Unity in this directory.
+
+      \__Assets\Scripts
+          GameManager.cs
+          PlatformIntegration.cs - MobiledgeX platform integration code
+          MobiledgeXIntegration.cs  - workshop empty code
+      \__ iosPingPongGame\Classes\PlatformIntegration.m - iOS platform specific code to get carrierName
+
+      \__ ProjectSettings - This project's Unity specific metadata and project files
+
+\__PingPongGame - Client code completed MobiledgeX SDK integration. (If you skimmed and want to skip the copy and paste sections here).
+   
+\__PingPongServer - Server code, this is already installed in the MobiledgeX infrastructure
+      \__ yawsps.js - Yet Another WebSocket Pong Server, Dockerfile, Makefile, updated from standard practice to respond to /, which isn't very different from default. Also available if the hackathon is true to its title, and brings the server down from new features added.
+      \__ wsclient.js - Just a dummy test client in case there's a shortage of test devices/SIM cards.
+
+3. Open this project folder in Unity: edge-cloud-sampleapps/unity/PingPongGameExample/PingPongGameSkeleton
+
+4. Load the PingPongApplication scene under Assets>Scenes.
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-24 at 2.51.44 PM.png
+
+## Step 2: Get the MobiledgeX MatchingEngineSDKRestLibrary DLL file
+To get the MobiledgeX MatchingEngineSDKRestLibrary DLL file:
+
+ 1. Create the Plugins directory for the project by entering <your project name folder>/Assets/Plugins.
+ 2. Grab the raw MatchingEngineSDKRestLibrary.dll file. 1.4.15 is the latest version.  Credentials must be granted to access the binary code. With login credentials granted, add the repository. //Can we remove 1.4.15 and just tell them to grab the latest version? 
+	 a. nuget sources Add -Name MobiledgeX -Source https://artifactory.mobiledgex.net/artifactory/api/nuget/nuget-releases -username <USERNAME> -password <PASSWORD>.
+	 b. nuget list -Source "MobiledgeX" 
+	 c. nuget install MobiledgeX.MatchingEngineRestSDKLibrary -Version 1.4.15
+ 3. Find the pre-extracted DLL here in the user's home directory:
+	 a. ~/.nuget/packages/mobiledgex.matchingenginerestsdklibrary
+	 b. cd ~/.nuget/packages/mobiledgex.matchingenginerestsdklibrary/1.4.14/lib/netstandard2.0
+	 c. cp MatchingEngineSDKRestLibrary.dll <your project name folder>/Assets/Plugins
+ 4. The Unity Editor will show the DLL library is importing. If no errors exist, Unity Scripts using C# will be able to reference and use the MatchingEngine library code. The MatchingEngine library code inhabits the assets folder inside the Unity Editor.
+## Step 3: Configure Unity
+With the MatchingEngineSDKRestLibarary DLL file acquired:
+
+1. Choose a device build target.
+2. View the device target app signaling details.
+3. Add location permissions request.
+### Choose a device build target
+1. In the Unity Editor, go to File>Build Settings.
+2. Select Android or iOS, corresponding with the Operating System in use.
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-22 at 3.35.58 PM.png
+
+3. Select Switch Platform to swap device toolchains underneath Unity:
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-22 at 3.36.56 PM.png
+
+### Device Target App Signing details
+1. Navigate to the Android/iOS tab.
+2. Select File>Building Settings>Player Settings.
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-22 at 3.51.29 PM.png
+
+3. Change the bundle identifier by navigating to Project Settings>Player>Identification>Bundler Identifier. 
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-22 at 5.13.35 PM.png
+
+4. For application signing purposes, create a unique name for the Bundle Identifier for each of the iOS and Android targets.  For example: com.<yourCompanyName>.pingponggame.
+
+### Add a Location Permission Request
+Location services are available for extraction on many target platforms within Unity. Location services are provided in the skeleton app code. Upon first use, a system dialog will appear once the user provides text.  Further customization for suitable apps should be applied.
+
+To add a location permissions request:
+
+1. Navigate to Build settings (Shift + Command + B on macOS).
+2. Go to Players>Configuration>Location Usage Description.
+
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-22 at 3.51.29 PM.png
+
+## MobiledgeX Integration
+The incomplete MobiledgeX integration implementation is located in the directory as PingPongGameExample/PingPongGameSkeleton. Modification of the MobiledgexIntegration.cs file is required. Additionally, if more functionality is desired, PlatformIntegration.cs file may be inspected for additional platform-specific functions. MobiledgexIntegration.cs file serves as an abstraction layer for different platforms.
+
+### Assets/Scripts/PlatformIntegration.cs
+To modify the PlatformIntegration.cs file, double- click to open. See below.  Once the file is open, Visual Studio will also open, allowing the user to edit the C# file. The file contains the GetCurrentCarrierName() interface that requires implementation on each platform utilized by the user.
+
+
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-24 at 3.05.20 PM.png
+```
+namespace MexPongGame
+{
+  public class PlatformIntegration : DistributedMatchEngine.ICarrierInfo
+  {
+    // Sets platform specific internal callbacks (reference counted objects), etc.
+    [DllImport("__Internal")]
+    private static extern string _ensureMatchingEnginePlatformIntegration();
+
+    [DllImport("__Internal")]
+    private static extern string _getCurrentCarrierName();
+
+    [DllImport("__Internal")]
+    private static extern string _getMccMnc();
+```
+With changes applied, implement the Android or the IOS C# code. Depending on which target platform is selected, some code may be grayed out. Switch platforms if the desired code referenced is grayed out.
+
+#### For Android
+Implement the following C# code for Android:
+```
+#if UNITY_ANDROID // PC android target builds to through here as well.
+    AndroidJavaObject GetTelephonyManager() {
+      AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+      AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+      if (activity == null)
+      {
+       Debug.Log("Can't find an activity!");
+       return null;
+      }
+
+     AndroidJavaObject context = activity.Call<AndroidJavaObject>("getApplicationContext");
+
+      if (context == null)
+      {
+        Debug.Log("Can't find an app context!");
+        return null;
+      }
+
+      // Context.TELEPHONY_SERVICE:
+      string CONTEXT_TELEPHONY_SERVICE = context.GetStatic<String>("TELEPHONY_SERVICE");
+      AndroidJavaObject telManager = context.Call<AndroidJavaObject>("getSystemService", CONTEXT_TELEPHONY_SERVICE);
+
+      return telManager;
+    }
+
+    public string GetCurrentCarrierName()
+    {
+      string networkOperatorName = "";
+      Debug.Log("Device platform: " + Application.platform);
+      if (Application.platform != RuntimePlatform.Android)
+      {
+        Debug.Log("Not on android device.");
+        return "";
+      }
+      AndroidJavaObject telManager = GetTelephonyManager();
+
+      if (telManager == null)
+      {
+        Debug.Log("Can't get telephony manager!");
+        return "";
+      }
+
+      networkOperatorName = telManager.Call<String>("getNetworkOperatorName", new object[0]);
+
+      if (networkOperatorName == null)
+      {
+        Debug.Log("Network Operator Name is not found on the device");
+        networkOperatorName = "";
+      }
+
+      return networkOperatorName;
+    }
+
+    public string GetMccMnc()
+    {
+      string mccmnc = "";
+      if (Application.platform != RuntimePlatform.Android)
+      {
+        Debug.Log("Not on android device.");
+        return "";
+      }
+
+      AndroidJavaObject telManager = GetTelephonyManager();
+
+      if (telManager == null)
+      {
+        Debug.Log("Can't get telephony manager!");
+        return "";
+      }
+
+      mccmnc = telManager.Call<String>("getNetworkOperator", new object[0]);
+
+      if (mccmnc == null) {
+        return null;
+      }
+
+      if (mccmnc.Length < 5) {
+        return null;
+      }
+      return mccmnc;
+    }
+```
+
+#### For IOS
+Note there's this at the top:
+```
+// We need this one for importing our IOS functions
+using System.Runtime.InteropServices;
+```
+```
+#elif UNITY_IOS
+    public string GetCurrentCarrierName()
+    {
+      string networkOperatorName = "";
+      if (Application.platform == RuntimePlatform.IPhonePlayer)
+      {
+        networkOperatorName = _getCurrentCarrierName();
+      }
+      return networkOperatorName;
+    }
+
+    public string GetMccMnc()
+    {
+      string mccmnc = null;
+      if (Application.platform == RuntimePlatform.IPhonePlayer)
+      {
+        mccmnc = _getMccMnc();
+      }
+      return mccmnc;
+    }
+```
+
+The code references  RuntimePlatform, and __getCurrentCarrierName() calls to native code. The code references are located in the file iosPingPongGame/Classes/PlatformIntegration.m
+
+1. For iOS, when building (File> Build Settings>Build) the exported build project for the first time, you will see this:
+ Undefined symbol: __getCurrentCarrierName
+That's correct. The file to add to the generated Xcode project is located here. Copy and add it to the Xcode project Classes folder: iosPingPongGame/Classes/PlatformIntegration.
+2. Add the CoreTelephony.framework file. Under iDevice>Build Phases>Link Binary with Libraries, at the bottom of the list of frameworks, click the plus + symbol.
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-23 at 3.06.48 PM.png
+
+3. If you don't already have an Apple developer build id, go to Apple to obtain one here.
+4. Update the Bundle identifier in Unity, re-export (Append, do not replace), then choose a development signing key below to sign the new app.
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-01-17 at 2.27.16 PM.png
+## Assets/Scripts/MobiledgeXIntegration.cs
+With the Unity platform-specific information now abstracted by PlatformIntegration.cs, MobiledgeX MatchingEngine support may be added. The application uses this as a very thin abstraction over the MobiledgeX MatchingEngine SDK. It allows the user to specify developer-specific application details as a lookup keyset + Geolocation to pass to the MatchingEngine SDK. It also retrieves information that allows the application to communicate with the appropriate edge server.
+
+The SDK requires the following information (set integration.useDemo = true in GameManager.cs (if it's not already set).
+
+For the Hackathon, the user will identify the individual Team's edge server, then update the MobiledgeXIntegratation.cs file to point to the individual teams edge server:
+
+public string carrierName { get; set; } = "TMPL"; // carrierName depends on the available subscriber SIM card and roaming carriers, and must be supplied by platform API.
+```
+public string devName { get; set; } = "HackathonTeam-NN"; // Your developer name. NN represents your Team name. Change it.
+public string appName { get; set; } = "Pong"; // Your appName, if you have created this in the MobiledgeX console.
+```
+
+Locate and update the current setup:
+```
+// namespace where the MatchingEngine exists:
+using DistributedMatchEngine;
+
+public class MobiledgeXIntegration
+{
+  PlatformIntegration pIntegration;
+  MatchingEngine me;
+
+  /*
+   * These are "carrier independent" settings for demo use:
+   */
+  public string carrierName { get; set; } = "TDG"; // Change this to TMPL. carrierName depends on the the subscriber SIM card and roaming carriers, and must be supplied a platform API.
+  public string devName { get; set; } = "MobiledgeX"; // Change this to your TEAM NAME: HackathonTeam-NN, your team will be pointing to independent pong servers.
+  public string appName { get; set; } = "Pong";
+  public string appVers { get; set; } = "1.0";
+  public string developerAuthToken { get; set; } = ""; // This is an opaque string value supplied by the developer.
+```
+
+
+Three thin APIs wrappers are customized for the MobliedgeX enabled PingPongApp:
+
+- RegisterClient() - Identifies the application details and user, and allows the use of MobiledgeX integration.
+- FindCloudlet() - Returns the edge application server to communicate within the form of an AppPort list that needs to be parsed to get your particular application's server details. Ex: TCP or UDP transports.
+- VerifyLocation() - Returns the distance between the location that is claimed by the user and what the carrier identifies. Public fields such as getTowerStatus(), getGpsLocationStatus(), and getGpsLocationAccuracyKm() allow the developer to ensure the user's location is accurate.
+
+For this workshop, if the user desires a different server that FindCloudlet() is unaware of,  change the IP address inside the Assets/Scripts/GameManager.cs file and set useAltServer=true. If the user desires a private server to compare how the Ping Pong Application operates with minimum hops between the client and server, the user may run the node.js server directly.  Also, the user may install the server inside a Docker container to run locally.RegisterClient
+
+Find and Replace:
+```
+  public async Task<bool> Register()
+  {
+    Debug.Log("Register is NOT IMPLEMENTED");
+    return false;
+  }
+```
+With:
+```
+  public async Task<bool> Register()
+  {
+    string aCarrierName = GetCarrierName();
+    string eCarrierName;
+    if (useDemo)
+    {
+      eCarrierName = carrierName;
+    }
+    else
+    {
+      if (aCarrierName == null)
+      {
+        Debug.Log("Missing CarrierName for RegisterClient.");
+        return false;
+      }
+      eCarrierName = aCarrierName;
+    }
+
+    RegisterClientRequest req = me.CreateRegisterClientRequest(eCarrierName, devName, appName, appVers, "" /* developer specific string blob */);
+    Debug.Log("CarrierName: " + req.carrier_name);
+    Debug.Log("DevName: " + req.dev_name);
+    Debug.Log("AppName: " + req.app_name);
+    Debug.Log("AppVers: " + req.app_vers);
+
+    RegisterClientReply reply;
+    if (useDemo)
+    {
+      reply = await me.RegisterClient(dmeHost, dmePort, req);
+    }
+    else
+    {
+      reply = await me.RegisterClient(req);
+    }
+
+    return (reply.status == ReplyStatus.RS_SUCCESS);
+  }
+```
+
+Build and run. The user may use the UnityEditor/Unity Player on the PC development machine to run this by clicking the play button:
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-04-24 at 3.53.50 PM.png
+
+In Assets/Scripts/GameManager.cs, there's a function called:
+
+    async Task<string> RegisterAndFindCloudlet()
+
+A debug breakpoint may be inserted and followed if desired:
+
+
+      bool registered = await integration.Register();
+
+#### FindCloudlet
+Find and replace:
+```
+  public async Task<FindCloudletReply> FindCloudlet()
+  {
+    Debug.Log("FindCloudlet is NOT IMPLEMENTED");
+    FindCloudletReply reply = null;
+
+    return reply;
+  }
+```
+With:
+
+```
+  public async Task<FindCloudletReply> FindCloudlet()
+  {
+    // Location is ephemeral, so retrieve a new location from the platform. May return 0,0 which is
+    // technically valid, though less likely real, as of writing.
+    Loc loc = await GetLocationFromDevice();
+
+    // If MEX is reachable on your SIM card:
+    string aCarrierName = me.carrierInfo.GetCurrentCarrierName();
+    string eCarrierName;
+    if (useDemo) // There's no host (PC, UnityEditor, etc.)...
+    {
+      eCarrierName = carrierName;
+    }
+    else
+    {
+      if (aCarrierName == "" || aCarrierName == null)
+      {
+        Debug.Log("Missing CarrierName for FindCloudlet.");
+        return null;
+      }
+      eCarrierName = aCarrierName;
+    }
+
+    FindCloudletRequest req = me.CreateFindCloudletRequest(eCarrierName, devName, appName, appVers, loc);
+
+    FindCloudletReply reply;
+    if (useDemo)
+    {
+      reply = await me.FindCloudlet(dmeHost, dmePort, req);
+    }
+    else
+    {
+      reply = await me.FindCloudlet(req);
+    }
+
+    return reply;
+  }
+  ```
+Carrier support will allow a connection to the appropriate Distributed Match Engine server-side to detect and locate the corresponding Edge cloudlet for each team (HackathonTeam-NN, where NN is your team number).
+
+	Note: The reply loops through the available app ports allowing server URL construction and connection.
+
+In GameManager.cs, look for the reply object. The reply object is a wrapper over the DME server's REST response:
+
+RegisterAndFindCloudlet:
+```
+foreach (AppPort ap in reply.ports)
+{
+	clog("Port: proto: " + ap.proto + ", prefix: " + ap.fqdn_prefix + ", 
+				path_prefix: " + ap.path_prefix + ", port: " + ap.public_port);
+
+    // We're looking for one of the TCP app ports:
+    if (ap.proto == LProto.L_PROTO_TCP)
+    {
+    	tcpAppPort = reply.fqdn + ":" + ap.public_port;
+        // FQDN prefix to append to base FQDN in FindCloudlet response. May be empty.
+        if (ap.fqdn_prefix != "")
+        {
+        	tcpAppPort = ap.fqdn_prefix + tcpAppPort;
+        }
+
+        // Add to test targets.
+        hostAndPort = new NetTest.HostAndPort {  host = ap.fqdn_prefix + reply.fqdn, port = ap.public_port };
+        netTest.sites.Enqueue(hostAndPort);
+    }
+}
+```
+
+In our case, this pong server is not just a TCP server, but a WebSocket server. You can append an unencrypted WebSocket protocol in front "ws://" to the desired TCP app port registered with MobiledgeX. For this workshop, you will get something that looks like this constructed app port: ws://ponggame1-tcp.krakow-main.tmpl.mobiledgex.net:3000]
+
+Build and test (or look at the Unity editor's console tab for Debug.Log output):
+
+swdev > Workshop: Adding MobiledgeX MatchingEngine SDK to Unity Ping Pong Demo App > Screen Shot 2019-09-26 at 11.26.38 AM.png
+
+
+
+#### VerifyLocation
+        Find and replace:
+
+  public async Task<bool> VerifyLocation()
+  {
+    Debug.Log("VerifyLocation is NOT IMPLEMENTED");
+    return false;
+  }
+
+
+       With:
+```
+  public async Task<bool> VerifyLocation()
+  {
+    Loc loc = await GetLocationFromDevice();
+
+    // If MEX is reachable on your SIM card:
+    string aCarrierName = pIntegration.GetCurrentCarrierName();
+    string eCarrierName;
+    if (useDemo) // There's no host (PC, UnityEditor, etc.)...
+    {
+      eCarrierName = carrierName;
+    }
+    else
+    {
+      eCarrierName = aCarrierName;
+    }
+
+    VerifyLocationRequest req = me.CreateVerifyLocationRequest(eCarrierName, loc);
+
+    VerifyLocationReply reply;
+    if (useDemo)
+    {
+      reply = await me.VerifyLocation(dmeHost, dmePort, req);
+    }
+    else
+    {
+      reply = await me.VerifyLocation(req);
+    }
+
+    // The return is not binary, but one can decide the particular app's policy
+    // on pass or failing the location check. Not being verified or the country
+    // not matching at all is on such policy decision:
+
+    // GPS and Tower Status:
+    switch (reply.gps_location_status) {
+      case VerifyLocationReply.GPSLocationStatus.LOC_ROAMING_COUNTRY_MISMATCH:
+      case VerifyLocationReply.GPSLocationStatus.LOC_ERROR_UNAUTHORIZED:
+      case VerifyLocationReply.GPSLocationStatus.LOC_ERROR_OTHER:
+      case VerifyLocationReply.GPSLocationStatus.LOC_UNKNOWN:
+        return false;
+    }
+
+    switch (reply.tower_status) {
+      case VerifyLocationReply.TowerStatus.NOT_CONNECTED_TO_SPECIFIED_TOWER:
+      case VerifyLocationReply.TowerStatus.TOWER_UNKNOWN:
+        return false;
+    }
+
+    // Distance? A negative value means no verification was done.
+    if (reply.gps_location_accuracy_km < 0f)
+    {
+      return false;
+    }
+
+    // A per app policy decision might be 0.5 km, or 25km, or 100km:
+    if (reply.gps_location_accuracy_km < 100f)
+    {
+      return true;
+    }
+
+    // Too far for this app.
+    return false;
+  }
+```
+
+#### Edge Server
+The user may register and FindCloudlet to a different server. Go to MobiledgeXIntegration.cs, and enter TDG for carrierName, and MobiledgeX for devName to get TDG edge server(s) in Bonn, Germany, for comparison. Doing this runs an unmodified copy of the Ping Pong Server.
+```
+public class MobiledgeXIntegration
+{
+  PlatformIntegration pIntegration;
+  MatchingEngine me;
+
+  /*
+   * These are "carrier independent" settings for demo use:
+   */
+  public string carrierName { get; set; } = "TMPL"; // carrierName depends on the available subscriber SIM card and roaming carriers, and must be supplied by platform API.
+  public string devName { get; set; } = "HackathonTeam-NN"; // Your developer name. NN represents your Team name. Change it.
+  public string appName { get; set; } = "Pong"; // Your appName, if you have created this in the MobiledgeX console.
+  public string appVers { get; set; } = "1.0";
+  public string developerAuthToken { get; set; } = ""; // This is an opaque string value supplied by the developer.
+
+  // Override if there is a sdk demo DME host to use.
+  public string dmeHost { get; set; } = MatchingEngine.fallbackDmeHost;
+  public uint dmePort { get; set; } = MatchingEngine.defaultDmeRestPort;
+  public bool useDemo { get; set; } = true;
+```
+
+With both servers connected, the user may add the servers to the netTest object's site list in GameManager.cs.  Once both servers are added, periodic tests of the roundtrip time may be performed between each server during game play. Additionally, application focus is available in the UnityEditor.
+```
+// Add to test targets.
+hostAndPort = new NetTest.HostAndPort {  host = ap.fqdn_prefix + reply.fqdn, port = ap.public_port };
+netTest.sites.Enqueue(hostAndPort);
+```
+
+### Location Services
+The LocationService code is provided within the skeleton app. This code is in Assets/Scripts/LocationService.cs, is a standard Unity Documentation code for getting a device source, device-independent location services. It's used for the following:
+
+- Retrieves the device version of GPS. FindCloudlet() is used to locate the closest/lowest latency edgecloudlet.
+- Verifies the location (by using the MobiledgeX MatchingEngine SDK ) using Carrier provided location services, in case the location is mocked, either for test and development purposes, or malicious reasons on the device. The MobiledgeX api for that is VerifyLocation.
+
+### Step 4: Build to your target device
+To build your target device:
+
+1. Go to File>Build Settings>Build and Run. (Shift + Command + B).
+The game is not playable until a second player connects to the pong game edge cloudlet, and joins the game match with the same Room ID (any string name). T
+2. Type in a string, such as Game1, and it should wait for the other player to join.The minimally viable game lobby on the server will pair the client with another network player. 
+The UnityEditor serves as a second client device.  The user may play Ping Pong between devices and the development PC if the server deems possible.
+
+**WARNING for the workshop:** There may be specific issues with the earlier WebSocket server.  If difficulties are encountered with lobby pairing of players, restart both clients and the development machine UnityPlayer. //Is this an internal comment? Should this be in the document?
+
+## Appendix A: Hackathon Tips and Tricks
+1. There is no physics prediction in the hackathon app to aid lower bandwidth or high latency networks.
+Try to mask the latency as much as possible
+2. At some point, latency is high enough such that real-time interaction is impossible. The max velocity is too high, or the latency is too high, and the other player will not get an update before the game round is over. Find a gameplay workaround or predictive solution to reduce event notification delays.
+3. It is possible to install the docker image on the local machine running Docker, and adjust the server simulated latency, if not packet delivery consistency:
+yawsps.js on the deployed demo pong server: const SIMULATELAGTIMEINMS = 0
+4. Compare edge to higher latency networks.
+5. Make the game pretty.
+6. Integrate MobiledgeX MatchingEngine SDK into your own app.
+7. Stuff that hasn't been developed or tested (may require developing unimplemented server features) 
+a. Change the score keeping scheme: +1 point if you pass to a team mate, -1 if you pass to an opponent.
+b. Add a third or fourth player
+c. Change the paddle shape (curve, broken pattern, air hockey, alter rigidbody2d, etc.)
+d. Create a warp zone in the middle of field that introduces random motion
+e. Progressively accelerate the speed of the ball
+f. Make ball sticky (and double tap to release)
+g. Balls can change properties and break through paddles
+h. Enable the ball to shatter into an array
+i. Add obstacles to the playing field (with possibility to break them)
+j. Leverage AR glasses as an endpoint rather than handsets 
+k. A multitouch screen ought to allow setting the paddle angle, right?
+
+
+
+
+
+
+
+
+
+
+
+ 
